@@ -453,10 +453,7 @@ listWrap.addEventListener('click', (e)=>{
 });
 </script>
 </body>
-</html>\`);
-});
-
-module.exports = router;`);
+</html>`);
 });
 
 module.exports = router;
