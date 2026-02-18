@@ -365,7 +365,7 @@ Half time refreshments</textarea>
           addThumb("galleryThumbs", url, function(box, pick){
             box.classList.toggle("sel");
             var ta=document.getElementById("images");
-            var lines=(ta.value||"").split(/\n/).map(function(s){return s.trim()}).filter(Boolean);
+            var lines=(ta.value||"").split("\n").map(function(s){return s.trim()}).filter(Boolean);
             if(box.classList.contains("sel")){
               if(lines.indexOf(pick)===-1) lines.push(pick);
             } else {
@@ -618,7 +618,7 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
         var b2=addThumb(galWrap, url, function(box, pick){
           box.classList.toggle("sel");
           var ta=document.getElementById("images");
-          var lines=(ta.value||"").split(/\n/).map(function(s){return s.trim()}).filter(Boolean);
+          var lines=(ta.value||"").split("\n").map(function(s){return s.trim()}).filter(Boolean);
           if (box.classList.contains("sel")) { if (lines.indexOf(pick)===-1) lines.push(pick); }
           else { lines=lines.filter(function(s){return s!==pick}); }
           ta.value=lines.join("\n");
@@ -802,7 +802,7 @@ router.post('/', express.urlencoded({ extended: true }), express.json(), async (
       detailsIntro: body.detailsIntro || 'Win Hospitality Tickets to a Top Fixture',
       detailsItems: Array.isArray(body.detailsItems) ? body.detailsItems
                   : (typeof body.detailsItems === 'string' && body.detailsItems.trim()
-                      ? body.detailsItems.split(/\n/).map(s => s.trim()).filter(Boolean) : []),
+                      ? body.detailsItems.split("\n").map(s => s.trim()).filter(Boolean) : []),
       status: body.status || 'live', sport: body.sport || '', match: body.match || '',
       entries: body.entries ? Number(body.entries) : 0, winner: body.winner || ''
     };
@@ -844,7 +844,7 @@ router.post('/:id', express.urlencoded({ extended: true }), express.json(), asyn
       detailsIntro: body.detailsIntro || 'Win Hospitality Tickets to a Top Fixture',
       detailsItems: Array.isArray(body.detailsItems) ? body.detailsItems
                   : (typeof body.detailsItems === 'string' && body.detailsItems.trim()
-                      ? body.detailsItems.split(/\n/).map(s => s.trim()).filter(Boolean) : []),
+                      ? body.detailsItems.split("\n").map(s => s.trim()).filter(Boolean) : []),
       status: body.status || 'live', sport: body.sport || '', match: body.match || '',
       entries: body.entries ? Number(body.entries) : 0, winner: body.winner || ''
     };
