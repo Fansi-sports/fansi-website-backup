@@ -551,7 +551,7 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
 
         <aside class="card prev">
           <div class="pcard">
-            <div class="pc-img" id="prevImg">${c.prizeImage?`<img src="${c.prizeImage}"/>`:'<span class="hint">Prize</span>'}</div>
+            <div class="pc-img" id="prevImg">${c.prizeImage?('<img src="'+c.prizeImage+'"/>'):'<span class="hint">Prize</span>'}</div>
             <div class="pc-title" id="prevTitle">${(c.title||'Preview Title')}</div>
             <div class="pc-date" id="prevDate">${c.drawDate?('Draw: '+new Date(c.drawDate).toLocaleString()):'Draw: TBC'}</div>
             <div class="pc-count">
