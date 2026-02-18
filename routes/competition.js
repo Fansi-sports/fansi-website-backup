@@ -402,10 +402,10 @@ Half time refreshments</textarea>
           var data = await res.json();
           if(!res.ok) throw new Error(data.error||'Upload failed');
           document.getElementById('cardImage').value = data.url;
-          status.textContent='✅ Uploaded!';
+          status.textContent='\u2705 Uploaded!';
           var prev=document.getElementById('prevImg'); prev.innerHTML='';
           var im=document.createElement('img'); im.src=data.url; prev.appendChild(im);
-        }catch(e){ status.textContent='❌ '+e.message; }
+        }catch(e){ status.textContent='\u274C '+e.message; }
         finally{ this.disabled=false; }
       });
     </script>
@@ -650,10 +650,10 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
           var data = await res.json();
           if(!res.ok) throw new Error(data.error||'Upload failed');
           document.getElementById('cardImage').value = data.url;
-          status.textContent='✅ Uploaded!';
+          status.textContent='\u2705 Uploaded!';
           var prev=document.getElementById('prevImg'); prev.innerHTML='';
           var im=document.createElement('img'); im.src=data.url; prev.appendChild(im);
-        }catch(e){ status.textContent='❌ '+e.message; }
+        }catch(e){ status.textContent='\u274C '+e.message; }
         finally{ this.disabled=false; }
       });
     </script>
