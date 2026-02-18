@@ -162,6 +162,10 @@ router.get('/admin/competitions/new', (_req, res) => {
       .thumb img{width:100%;height:100%;object-fit:cover;display:block}
       .thumb.sel{outline:3px solid rgba(255,87,87,.35);border-color:#ff5757}
       .empty{padding:8px;border:1px dashed #dcd6ef;border-radius:10px;color:#6b6691;font-size:12px}
+      .upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+      .upload-btn{background:#ff5757;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;font-size:13px}
+      .upload-btn:disabled{opacity:0.6;cursor:not-allowed}
+      .upload-status{font-size:12px;color:#6b6691}
     </style>
   </head>
   <body>
@@ -171,7 +175,6 @@ router.get('/admin/competitions/new', (_req, res) => {
         <form id="compForm" class="card" method="post" action="/api/competitions">
           <input type="hidden" id="drawDateHidden" name="drawDate"/>
           <div class="row"><label>Category</label>
-            <!-- ✅ added launch here -->
             <select name="category" id="cat" required>
               <option value="weekly">weekly</option>
               <option value="featured">featured</option>
@@ -184,7 +187,7 @@ router.get('/admin/competitions/new', (_req, res) => {
               <option>Premier League Football</option>
               <option>Championship Football</option>
               <option>Premiership Rugby</option>
-              <option>Women’s Super League</option>
+              <option>Women's Super League</option>
               <option>Golf</option>
               <option>Tennis</option>
               <option>F1</option>
@@ -204,7 +207,16 @@ router.get('/admin/competitions/new', (_req, res) => {
           <div class="row"><label>Stadium</label><input id="stadium" name="stadium" placeholder="Stadium name"/></div>
           <div class="row"><label>Prize blurb</label><input id="prizeBlurb" name="prizeBlurb" placeholder="Win VIP hospitality tickets..."/></div>
 
-          <div class="row"><label>Card image</label><input id="cardImage" name="cardImage" placeholder="(optional) one URL"/></div>
+          <div class="row"><label>Card image</label>
+            <div style="width:100%">
+              <input id="cardImage" name="cardImage" placeholder="(optional) one URL"/>
+              <div class="upload-row">
+                <input type="file" id="uploadFile1" accept="image/*" style="font-size:12px"/>
+                <button type="button" id="uploadBtn1" class="upload-btn">Upload to Cloudinary</button>
+                <span id="uploadStatus1" class="upload-status"></span>
+              </div>
+            </div>
+          </div>
           <div class="row"><label></label>
             <div style="width:100%">
               <div class="group-title">Pick ONE for the card (from backend assets)</div>
@@ -322,13 +334,13 @@ Half time refreshments</textarea>
           addThumb("galleryThumbs", url, function(box, pick){
             box.classList.toggle("sel");
             var ta=document.getElementById("images");
-            var lines=(ta.value||"").split(/\\r?\\n/).map(function(s){return s.trim()}).filter(Boolean);
+            var lines=(ta.value||"").split(/\r?\n/).map(function(s){return s.trim()}).filter(Boolean);
             if(box.classList.contains("sel")){
               if(lines.indexOf(pick)===-1) lines.push(pick);
             } else {
               lines=lines.filter(function(s){return s!==pick;});
             }
-            ta.value=lines.join("\\n");
+            ta.value=lines.join("\n");
           });
         });
       })();
@@ -345,6 +357,25 @@ Half time refreshments</textarea>
       // Ensure drawDate (ISO) is posted
       document.getElementById("compForm").addEventListener("submit", function(){
         document.getElementById("drawDateHidden").value = buildISO();
+      });
+
+      // ✅ Cloudinary upload button
+      document.getElementById('uploadBtn1').addEventListener('click', async function(){
+        var file = document.getElementById('uploadFile1').files[0];
+        var status = document.getElementById('uploadStatus1');
+        if(!file){ status.textContent='Please select a file first.'; return; }
+        this.disabled=true; status.textContent='Uploading...';
+        var fd = new FormData(); fd.append('image', file);
+        try{
+          var res = await fetch('/admin/upload-image',{method:'POST',body:fd});
+          var data = await res.json();
+          if(!res.ok) throw new Error(data.error||'Upload failed');
+          document.getElementById('cardImage').value = data.url;
+          status.textContent='✅ Uploaded!';
+          var prev=document.getElementById('prevImg'); prev.innerHTML='';
+          var im=document.createElement('img'); im.src=data.url; prev.appendChild(im);
+        }catch(e){ status.textContent='❌ '+e.message; }
+        finally{ this.disabled=false; }
       });
     </script>
   </body>
@@ -399,6 +430,10 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
       .thumb{position:relative;height:64px;border:1px solid #e6e3ee;border-radius:10px;overflow:hidden;background:#fff;cursor:pointer}
       .thumb img{width:100%;height:100%;object-fit:cover;display:block}
       .thumb.sel{outline:3px solid rgba(255,87,87,.35);border-color:#ff5757}
+      .upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+      .upload-btn{background:#ff5757;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;font-size:13px}
+      .upload-btn:disabled{opacity:0.6;cursor:not-allowed}
+      .upload-status{font-size:12px;color:#6b6691}
     </style>
   </head>
   <body>
@@ -408,7 +443,6 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
         <form id="editForm" class="card" method="post" action="/api/competitions/${c._id}">
           <input type="hidden" id="drawDateHidden" name="drawDate"/>
           <div class="row"><label>Category</label>
-            <!-- ✅ added launch here and preselect logic -->
             <select name="category" id="cat" required>
               <option value="weekly"${c.category==='weekly'?' selected':''}>weekly</option>
               <option value="featured"${c.category==='featured'?' selected':''}>featured</option>
@@ -421,7 +455,7 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
               <option${c.league==='Premier League Football'?' selected':''}>Premier League Football</option>
               <option${c.league==='Championship Football'?' selected':''}>Championship Football</option>
               <option${c.league==='Premiership Rugby'?' selected':''}>Premiership Rugby</option>
-              <option${c.league==='Women’s Super League'?' selected':''}>Women’s Super League</option>
+              <option${c.league==="Women's Super League"?' selected':''}>Women's Super League</option>
               <option${c.league==='Golf'?' selected':''}>Golf</option>
               <option${c.league==='Tennis'?' selected':''}>Tennis</option>
               <option${c.league==='F1'?' selected':''}>F1</option>
@@ -441,7 +475,16 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
           <div class="row"><label>Stadium</label><input id="stadium" name="stadium" value="${(c.stadium||'').replace(/"/g,'&quot;')}" placeholder="Stadium name"/></div>
           <div class="row"><label>Prize blurb</label><input id="prizeBlurb" name="prizeBlurb" value="${(c.prizeBlurb||'').replace(/"/g,'&quot;')}" placeholder="Win VIP hospitality tickets..."/></div>
 
-          <div class="row"><label>Card image</label><input id="cardImage" name="cardImage" value="${(c.prizeImage||'').replace(/"/g,'&quot;')}" placeholder="(optional) one URL"/></div>
+          <div class="row"><label>Card image</label>
+            <div style="width:100%">
+              <input id="cardImage" name="cardImage" value="${(c.prizeImage||'').replace(/"/g,'&quot;')}" placeholder="(optional) one URL"/>
+              <div class="upload-row">
+                <input type="file" id="uploadFile1" accept="image/*" style="font-size:12px"/>
+                <button type="button" id="uploadBtn1" class="upload-btn">Upload to Cloudinary</button>
+                <span id="uploadStatus1" class="upload-status"></span>
+              </div>
+            </div>
+          </div>
           <div class="row"><label></label>
             <div style="width:100%">
               <div class="group-title">Pick ONE for the card (from backend assets)</div>
@@ -532,10 +575,8 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
         Array.prototype.forEach.call(container.querySelectorAll(".thumb.sel"), function(n){ n.classList.remove("sel"); });
       }
 
-      // Render thumbs and pre-select
       FILES.forEach(function(name){
         var url="/api/competitions/assets/"+encodeURIComponent(name);
-        // Card (single)
         var b1=addThumb(cardWrap, url, function(box, pick){
           clearSelected(cardWrap); markSelected(box);
           document.getElementById("cardImage").value=pick;
@@ -543,19 +584,17 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
         });
         if (SELECTED_PRIZE && url===SELECTED_PRIZE) markSelected(b1);
 
-        // Gallery (multi)
         var b2=addThumb(galWrap, url, function(box, pick){
           box.classList.toggle("sel");
           var ta=document.getElementById("images");
-          var lines=(ta.value||"").split(/\\r?\\n/).map(function(s){return s.trim()}).filter(Boolean);
+          var lines=(ta.value||"").split(/\r?\n/).map(function(s){return s.trim()}).filter(Boolean);
           if (box.classList.contains("sel")) { if (lines.indexOf(pick)===-1) lines.push(pick); }
           else { lines=lines.filter(function(s){return s!==pick}); }
-          ta.value=lines.join("\\n");
+          ta.value=lines.join("\n");
         });
         if (SELECTED_GALLERY.indexOf(url) !== -1) markSelected(b2);
       });
 
-      // Manual URL -> preview
       document.getElementById("cardImage").addEventListener("input", function(){
         var v=(this.value||"").trim();
         var prev=document.getElementById("prevImg");
@@ -567,6 +606,25 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
       document.getElementById("editForm").addEventListener("submit", function(){
         document.getElementById("drawDateHidden").value = buildISO();
       });
+
+      // ✅ Cloudinary upload button
+      document.getElementById('uploadBtn1').addEventListener('click', async function(){
+        var file = document.getElementById('uploadFile1').files[0];
+        var status = document.getElementById('uploadStatus1');
+        if(!file){ status.textContent='Please select a file first.'; return; }
+        this.disabled=true; status.textContent='Uploading...';
+        var fd = new FormData(); fd.append('image', file);
+        try{
+          var res = await fetch('/admin/upload-image',{method:'POST',body:fd});
+          var data = await res.json();
+          if(!res.ok) throw new Error(data.error||'Upload failed');
+          document.getElementById('cardImage').value = data.url;
+          status.textContent='✅ Uploaded!';
+          var prev=document.getElementById('prevImg'); prev.innerHTML='';
+          var im=document.createElement('img'); im.src=data.url; prev.appendChild(im);
+        }catch(e){ status.textContent='❌ '+e.message; }
+        finally{ this.disabled=false; }
+      });
     </script>
   </body>
 </html>`);
@@ -577,14 +635,9 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
 });
 
 /* ===========================================================
-   JSON API (unchanged)
+   JSON API
 =========================================================== */
 
-// ... everything below here stays exactly as in your file ...
-
-/**
- * Seed a sample FEATURED competition (clickable)
- */
 router.get('/seed-sample-featured', async (_req, res) => {
   try {
     const comp = await Competition.create({
@@ -612,9 +665,6 @@ router.get('/seed-sample-featured', async (_req, res) => {
   }
 });
 
-/**
- * Seed a sample WEEKLY competition (clickable)
- */
 router.get('/seed-sample-weekly', async (_req, res) => {
   try {
     const comp = await Competition.create({
@@ -640,9 +690,6 @@ router.get('/seed-sample-weekly', async (_req, res) => {
   }
 });
 
-/**
- * Quick creator for WEEKLY comps via URL (unchanged)
- */
 router.get('/create-weekly', async (req, res) => {
   try {
     const {
@@ -663,20 +710,11 @@ router.get('/create-weekly', async (req, res) => {
     }
 
     const comp = await Competition.create({
-      title,
-      league,
-      category: "weekly",
-      price: Number(price),
-      totalTickets: 10000,
-      date,
-      drawDate,
-      venue,
-      stadium,
-      prizeBlurb,
+      title, league, category: "weekly", price: Number(price),
+      totalTickets: 10000, date, drawDate, venue, stadium, prizeBlurb,
       images: ["/api/competitions/assets/stadium.jpg", "/api/competitions/assets/sports-crowd.jpg"],
       status: "live"
     });
-
     res.status(201).json(comp);
   } catch (err) {
     console.error('CREATE weekly error:', err);
@@ -684,16 +722,12 @@ router.get('/create-weekly', async (req, res) => {
   }
 });
 
-/**
- * GET /api/competitions  (JSON list; unchanged)
- */
 router.get('/', async (req, res) => {
   try {
     const { status, category } = req.query;
     const filter = {};
     if (status) filter.status = status;
     if (category) filter.category = category;
-
     const comps = await Competition.find(filter).sort({ drawDate: 1, createdAt: -1 });
     res.json(comps);
   } catch (err) {
@@ -702,13 +736,10 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET one by id (JSON; unchanged)
 router.get('/:id', async (req, res) => {
   try {
     const comp = await Competition.findById(req.params.id);
-    if (!comp) {
-      return res.status(404).json({ message: 'Competition not found' });
-    }
+    if (!comp) return res.status(404).json({ message: 'Competition not found' });
     res.json(comp);
   } catch (err) {
     console.error('❌ Fetch by ID error:', err);
@@ -716,34 +747,23 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-/**
- * POST /api/competitions  (create)
- */
 router.post('/', express.urlencoded({ extended: true }), express.json(), async (req, res) => {
   try {
     const body = req.body || {};
-
     let images = [];
-    if (Array.isArray(body.images)) {
-      images = body.images;
-    } else if (typeof body.images === 'string' && body.images.trim()) {
+    if (Array.isArray(body.images)) { images = body.images; }
+    else if (typeof body.images === 'string' && body.images.trim()) {
       images = body.images.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
     }
-
     const compPayload = {
-      title: body.title,
-      league: body.league || '',
-      category: body.category,
-      homeTeam: body.homeTeam || '',
-      awayTeam: body.awayTeam || '',
+      title: body.title, league: body.league || '', category: body.category,
+      homeTeam: body.homeTeam || '', awayTeam: body.awayTeam || '',
       price: Number(body.price),
       totalTickets: body.totalTickets ? Number(body.totalTickets) : 10000,
       soldTickets: body.soldTickets ? Number(body.soldTickets) : 0,
       maxPerUser: body.maxPerUser ? Number(body.maxPerUser) : 50,
-      date: body.date || '',
-      drawDate: body.drawDate || '',
-      venue: body.venue || '',
-      stadium: body.stadium || '',
+      date: body.date || '', drawDate: body.drawDate || '',
+      venue: body.venue || '', stadium: body.stadium || '',
       prizeBlurb: body.prizeBlurb || '',
       prizeImage: body.cardImage || (images[0] || ''),
       images,
@@ -751,21 +771,14 @@ router.post('/', express.urlencoded({ extended: true }), express.json(), async (
       detailsIntro: body.detailsIntro || 'Win Hospitality Tickets to a Top Fixture',
       detailsItems: Array.isArray(body.detailsItems) ? body.detailsItems
                   : (typeof body.detailsItems === 'string' && body.detailsItems.trim()
-                      ? body.detailsItems.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
-                      : []),
-      status: body.status || 'live',
-      sport: body.sport || '',
-      match: body.match || '',
-      entries: body.entries ? Number(body.entries) : 0,
-      winner: body.winner || ''
+                      ? body.detailsItems.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : []),
+      status: body.status || 'live', sport: body.sport || '', match: body.match || '',
+      entries: body.entries ? Number(body.entries) : 0, winner: body.winner || ''
     };
-
     if (!compPayload.title || !compPayload.category || compPayload.price == null || Number.isNaN(compPayload.price)) {
       return res.status(400).json({ message: 'title, category and price are required' });
     }
-
     const comp = await Competition.create(compPayload);
-
     if ((req.headers['content-type'] || '').includes('application/x-www-form-urlencoded')) {
       return res.redirect('/api/competitions/admin');
     }
@@ -776,34 +789,23 @@ router.post('/', express.urlencoded({ extended: true }), express.json(), async (
   }
 });
 
-/**
- * UPDATE (from Edit form)
- */
 router.post('/:id', express.urlencoded({ extended: true }), express.json(), async (req, res) => {
   try {
     const body = req.body || {};
-
     let images = [];
-    if (Array.isArray(body.images)) {
-      images = body.images;
-    } else if (typeof body.images === 'string' && body.images.trim()) {
+    if (Array.isArray(body.images)) { images = body.images; }
+    else if (typeof body.images === 'string' && body.images.trim()) {
       images = body.images.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
     }
-
     const payload = {
-      title: body.title,
-      league: body.league || '',
-      category: body.category,
-      homeTeam: body.homeTeam || '',
-      awayTeam: body.awayTeam || '',
+      title: body.title, league: body.league || '', category: body.category,
+      homeTeam: body.homeTeam || '', awayTeam: body.awayTeam || '',
       price: Number(body.price),
       totalTickets: body.totalTickets ? Number(body.totalTickets) : 10000,
       soldTickets: body.soldTickets ? Number(body.soldTickets) : 0,
       maxPerUser: body.maxPerUser ? Number(body.maxPerUser) : 50,
-      date: body.date || '',
-      drawDate: body.drawDate || '',
-      venue: body.venue || '',
-      stadium: body.stadium || '',
+      date: body.date || '', drawDate: body.drawDate || '',
+      venue: body.venue || '', stadium: body.stadium || '',
       prizeBlurb: body.prizeBlurb || '',
       prizeImage: body.cardImage || (images[0] || ''),
       images,
@@ -811,15 +813,10 @@ router.post('/:id', express.urlencoded({ extended: true }), express.json(), asyn
       detailsIntro: body.detailsIntro || 'Win Hospitality Tickets to a Top Fixture',
       detailsItems: Array.isArray(body.detailsItems) ? body.detailsItems
                   : (typeof body.detailsItems === 'string' && body.detailsItems.trim()
-                      ? body.detailsItems.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
-                      : []),
-      status: body.status || 'live',
-      sport: body.sport || '',
-      match: body.match || '',
-      entries: body.entries ? Number(body.entries) : 0,
-      winner: body.winner || ''
+                      ? body.detailsItems.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : []),
+      status: body.status || 'live', sport: body.sport || '', match: body.match || '',
+      entries: body.entries ? Number(body.entries) : 0, winner: body.winner || ''
     };
-
     await Competition.findByIdAndUpdate(req.params.id, payload, { new: true });
     return res.redirect('/api/competitions/admin');
   } catch (err) {
@@ -828,9 +825,6 @@ router.post('/:id', express.urlencoded({ extended: true }), express.json(), asyn
   }
 });
 
-/**
- * DELETE from Admin List
- */
 router.post('/:id/delete', async (req, res) => {
   try {
     await Competition.findByIdAndDelete(req.params.id);
@@ -841,9 +835,6 @@ router.post('/:id/delete', async (req, res) => {
   }
 });
 
-/**
- * JSON DELETE
- */
 router.delete('/:id', async (req, res) => {
   try {
     const del = await Competition.findByIdAndDelete(req.params.id);
