@@ -3,17 +3,6 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const router = express.Router();
-const multer = require('multer');
-const cloudinary = require('cloudinary').v2;
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-const upload = multer({ storage: multer.memoryStorage() });
 
 // Load model safely whether it's ESM default export or CJS
 let Competition = null;
@@ -24,26 +13,6 @@ try {
   const m = require('../models/competition');
   Competition = m.default || m;
 }
-
-/* -----------------------------------------------------------
-   Cloudinary upload endpoint
------------------------------------------------------------- */
-router.post('/admin/upload-image', upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file provided' });
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder: 'fansi-competitions' },
-        (error, result) => { if (error) reject(error); else resolve(result); }
-      );
-      stream.end(req.file.buffer);
-    });
-    res.json({ url: result.secure_url });
-  } catch (err) {
-    console.error('Upload error:', err);
-    res.status(500).json({ error: 'Upload failed' });
-  }
-});
 
 /* -----------------------------------------------------------
    Serve backend public assets at /api/competitions/assets/*
@@ -193,10 +162,6 @@ router.get('/admin/competitions/new', (_req, res) => {
       .thumb img{width:100%;height:100%;object-fit:cover;display:block}
       .thumb.sel{outline:3px solid rgba(255,87,87,.35);border-color:#ff5757}
       .empty{padding:8px;border:1px dashed #dcd6ef;border-radius:10px;color:#6b6691;font-size:12px}
-      .upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
-      .upload-btn{background:#ff5757;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;font-size:13px}
-      .upload-btn:disabled{opacity:0.6;cursor:not-allowed}
-      .upload-status{font-size:12px;color:#6b6691}
     </style>
   </head>
   <body>
@@ -238,16 +203,7 @@ router.get('/admin/competitions/new', (_req, res) => {
           <div class="row"><label>Stadium</label><input id="stadium" name="stadium" placeholder="Stadium name"/></div>
           <div class="row"><label>Prize blurb</label><input id="prizeBlurb" name="prizeBlurb" placeholder="Win VIP hospitality tickets..."/></div>
 
-          <div class="row"><label>Card image</label>
-            <div style="width:100%">
-              <input id="cardImage" name="cardImage" placeholder="(optional) one URL"/>
-              <div class="upload-row">
-                <input type="file" id="uploadFile1" accept="image/*" style="font-size:12px"/>
-                <button type="button" id="uploadBtn1" class="upload-btn">Upload to Cloudinary</button>
-                <span id="uploadStatus1" class="upload-status"></span>
-              </div>
-            </div>
-          </div>
+          <div class="row"><label>Card image</label><input id="cardImage" name="cardImage" placeholder="(optional) one URL"/></div>
           <div class="row"><label></label>
             <div style="width:100%">
               <div class="group-title">Pick ONE for the card (from backend assets)</div>
@@ -323,7 +279,6 @@ Half time refreshments</textarea>
       document.getElementById("drawTime").addEventListener("input", restart);
       restart();
 
-      // ---- Image tiles (embedded list, no fetch) ----
       var FILES = Array.isArray(window.__ASSETS__)?window.__ASSETS__:[];
       var cardWrap = null, galWrap = null;
 
@@ -351,7 +306,6 @@ Half time refreshments</textarea>
         FILES.forEach(function(name){
           var url="/api/competitions/assets/"+encodeURIComponent(name);
 
-          // Card picker (single)
           addThumb("cardThumbs", url, function(box, pick){
             clearSelected(cardWrap);
             box.classList.add("sel");
@@ -361,22 +315,20 @@ Half time refreshments</textarea>
             var im=document.createElement("img"); im.src=pick; prev.appendChild(im);
           });
 
-          // Gallery picker (multi)
           addThumb("galleryThumbs", url, function(box, pick){
             box.classList.toggle("sel");
             var ta=document.getElementById("images");
-            var lines=(ta.value||"").split("\n").map(function(s){return s.trim()}).filter(Boolean);
+            var lines=(ta.value||"").split("\\n").map(function(s){return s.trim()}).filter(Boolean);
             if(box.classList.contains("sel")){
               if(lines.indexOf(pick)===-1) lines.push(pick);
             } else {
               lines=lines.filter(function(s){return s!==pick;});
             }
-            ta.value=lines.join("\n");
+            ta.value=lines.join("\\n");
           });
         });
       })();
 
-      // Manual card image URL -> preview
       document.getElementById("cardImage").addEventListener("input", function(){
         var v=(this.value||"").trim();
         var prev=document.getElementById("prevImg");
@@ -385,28 +337,8 @@ Half time refreshments</textarea>
         var im=document.createElement("img"); im.src=v; prev.appendChild(im);
       });
 
-      // Ensure drawDate (ISO) is posted
       document.getElementById("compForm").addEventListener("submit", function(){
         document.getElementById("drawDateHidden").value = buildISO();
-      });
-
-      // ✅ Cloudinary upload button
-      document.getElementById('uploadBtn1').addEventListener('click', async function(){
-        var file = document.getElementById('uploadFile1').files[0];
-        var status = document.getElementById('uploadStatus1');
-        if(!file){ status.textContent='Please select a file first.'; return; }
-        this.disabled=true; status.textContent='Uploading...';
-        var fd = new FormData(); fd.append('image', file);
-        try{
-          var res = await fetch('/api/competitions/admin/upload-image',{method:'POST',body:fd});
-          var data = await res.json();
-          if(!res.ok) throw new Error(data.error||'Upload failed');
-          document.getElementById('cardImage').value = data.url;
-          status.textContent='\u2705 Uploaded!';
-          var prev=document.getElementById('prevImg'); prev.innerHTML='';
-          var im=document.createElement('img'); im.src=data.url; prev.appendChild(im);
-        }catch(e){ status.textContent='\u274C '+e.message; }
-        finally{ this.disabled=false; }
       });
     </script>
   </body>
@@ -424,7 +356,7 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
     const teamOptions = TEAM_OPTIONS.map(t => `<option value="${t}"></option>`).join('');
     const assets = listAssetImages();
     const assetsJson = JSON.stringify(assets);
-    const imagesText = (Array.isArray(c.images) ? c.images : []).join('\n');
+    const imagesText = (Array.isArray(c.images) ? c.images : []).join('\\n');
     const d = c.drawDate ? new Date(c.drawDate) : null;
     const dateVal = d ? String(d.toISOString()).slice(0,10) : '';
     const timeVal = d ? String(d.toISOString()).slice(11,16) : '19:30';
@@ -461,10 +393,6 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
       .thumb{position:relative;height:64px;border:1px solid #e6e3ee;border-radius:10px;overflow:hidden;background:#fff;cursor:pointer}
       .thumb img{width:100%;height:100%;object-fit:cover;display:block}
       .thumb.sel{outline:3px solid rgba(255,87,87,.35);border-color:#ff5757}
-      .upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
-      .upload-btn{background:#ff5757;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;font-size:13px}
-      .upload-btn:disabled{opacity:0.6;cursor:not-allowed}
-      .upload-status{font-size:12px;color:#6b6691}
     </style>
   </head>
   <body>
@@ -506,16 +434,7 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
           <div class="row"><label>Stadium</label><input id="stadium" name="stadium" value="${(c.stadium||'').replace(/"/g,'&quot;')}" placeholder="Stadium name"/></div>
           <div class="row"><label>Prize blurb</label><input id="prizeBlurb" name="prizeBlurb" value="${(c.prizeBlurb||'').replace(/"/g,'&quot;')}" placeholder="Win VIP hospitality tickets..."/></div>
 
-          <div class="row"><label>Card image</label>
-            <div style="width:100%">
-              <input id="cardImage" name="cardImage" value="${(c.prizeImage||'').replace(/"/g,'&quot;')}" placeholder="(optional) one URL"/>
-              <div class="upload-row">
-                <input type="file" id="uploadFile1" accept="image/*" style="font-size:12px"/>
-                <button type="button" id="uploadBtn1" class="upload-btn">Upload to Cloudinary</button>
-                <span id="uploadStatus1" class="upload-status"></span>
-              </div>
-            </div>
-          </div>
+          <div class="row"><label>Card image</label><input id="cardImage" name="cardImage" value="${(c.prizeImage||'').replace(/"/g,'&quot;')}" placeholder="(optional) one URL"/></div>
           <div class="row"><label></label>
             <div style="width:100%">
               <div class="group-title">Pick ONE for the card (from backend assets)</div>
@@ -532,7 +451,7 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
           </div>
 
           <div class="row"><label>Details list (one per line)</label>
-            <textarea name="detailsItems">${Array.isArray(c.detailsItems)?c.detailsItems.join('\n'):""}</textarea>
+            <textarea name="detailsItems">${Array.isArray(c.detailsItems)?c.detailsItems.join('\\n'):""}</textarea>
           </div>
 
           <div class="row"><label>Status</label>
@@ -618,10 +537,10 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
         var b2=addThumb(galWrap, url, function(box, pick){
           box.classList.toggle("sel");
           var ta=document.getElementById("images");
-          var lines=(ta.value||"").split("\n").map(function(s){return s.trim()}).filter(Boolean);
+          var lines=(ta.value||"").split("\\n").map(function(s){return s.trim()}).filter(Boolean);
           if (box.classList.contains("sel")) { if (lines.indexOf(pick)===-1) lines.push(pick); }
           else { lines=lines.filter(function(s){return s!==pick}); }
-          ta.value=lines.join("\n");
+          ta.value=lines.join("\\n");
         });
         if (SELECTED_GALLERY.indexOf(url) !== -1) markSelected(b2);
       });
@@ -636,25 +555,6 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
 
       document.getElementById("editForm").addEventListener("submit", function(){
         document.getElementById("drawDateHidden").value = buildISO();
-      });
-
-      // ✅ Cloudinary upload button
-      document.getElementById('uploadBtn1').addEventListener('click', async function(){
-        var file = document.getElementById('uploadFile1').files[0];
-        var status = document.getElementById('uploadStatus1');
-        if(!file){ status.textContent='Please select a file first.'; return; }
-        this.disabled=true; status.textContent='Uploading...';
-        var fd = new FormData(); fd.append('image', file);
-        try{
-          var res = await fetch('/api/competitions/admin/upload-image',{method:'POST',body:fd});
-          var data = await res.json();
-          if(!res.ok) throw new Error(data.error||'Upload failed');
-          document.getElementById('cardImage').value = data.url;
-          status.textContent='\u2705 Uploaded!';
-          var prev=document.getElementById('prevImg'); prev.innerHTML='';
-          var im=document.createElement('img'); im.src=data.url; prev.appendChild(im);
-        }catch(e){ status.textContent='\u274C '+e.message; }
-        finally{ this.disabled=false; }
       });
     </script>
   </body>
@@ -802,7 +702,7 @@ router.post('/', express.urlencoded({ extended: true }), express.json(), async (
       detailsIntro: body.detailsIntro || 'Win Hospitality Tickets to a Top Fixture',
       detailsItems: Array.isArray(body.detailsItems) ? body.detailsItems
                   : (typeof body.detailsItems === 'string' && body.detailsItems.trim()
-                      ? body.detailsItems.split("\n").map(s => s.trim()).filter(Boolean) : []),
+                      ? body.detailsItems.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : []),
       status: body.status || 'live', sport: body.sport || '', match: body.match || '',
       entries: body.entries ? Number(body.entries) : 0, winner: body.winner || ''
     };
@@ -844,7 +744,7 @@ router.post('/:id', express.urlencoded({ extended: true }), express.json(), asyn
       detailsIntro: body.detailsIntro || 'Win Hospitality Tickets to a Top Fixture',
       detailsItems: Array.isArray(body.detailsItems) ? body.detailsItems
                   : (typeof body.detailsItems === 'string' && body.detailsItems.trim()
-                      ? body.detailsItems.split("\n").map(s => s.trim()).filter(Boolean) : []),
+                      ? body.detailsItems.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : []),
       status: body.status || 'live', sport: body.sport || '', match: body.match || '',
       entries: body.entries ? Number(body.entries) : 0, winner: body.winner || ''
     };
