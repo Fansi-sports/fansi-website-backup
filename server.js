@@ -26,6 +26,7 @@ const { startAbandonedBasketJob } = require("./jobs/abandonedBasket");
 const Order = require("./models/Order");
 const Ticket = require("./models/Ticket");
 const User = require("./models/User");
+const Competition = require("./models/Competition");
 
 // ✅ Email service
 const { sendOrderConfirmationEmail } = require("./services/emailService");
@@ -261,7 +262,6 @@ app.post(
           }
 
           // ✅ Update soldTickets count on each competition
-          const Competition = require("./models/Competition");
           for (const it of updatedItems) {
             const compId = toObjectIdOrNull(String(it.competitionId || ""));
             const ticketsAllocated = (it.tickets || []).length;
