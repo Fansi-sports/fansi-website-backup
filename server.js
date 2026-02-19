@@ -260,6 +260,20 @@ app.post(
             ).catch(err => console.error("❌ Failed to mark basket as checked out:", err));
           }
 
+          // ✅ Update soldTickets count on each competition
+          const Competition = require("./models/Competition");
+          for (const it of updatedItems) {
+            const compId = toObjectIdOrNull(String(it.competitionId || ""));
+            const ticketsAllocated = (it.tickets || []).length;
+            if (compId && ticketsAllocated > 0) {
+              await Competition.findByIdAndUpdate(compId, {
+                $inc: { soldTickets: ticketsAllocated },
+              }).catch(err => console.error("❌ Failed to update soldTickets:", err));
+            }
+          }
+
+          console.log("✅ soldTickets updated for all competitions in order.");
+
           // Update user's points balance
           if (userId) {
             const user = await User.findById(userId);
