@@ -780,7 +780,6 @@ router.post('/:id', express.urlencoded({ extended: true }), express.json(), asyn
       homeTeam: body.homeTeam || '', awayTeam: body.awayTeam || '',
       price: Number(body.price),
       totalTickets: body.totalTickets ? Number(body.totalTickets) : 10000,
-      soldTickets: body.soldTickets ? Number(body.soldTickets) : 0,
       maxPerUser: body.maxPerUser ? Number(body.maxPerUser) : 50,
       date: body.date || '', drawDate: body.drawDate || '',
       venue: body.venue || '', stadium: body.stadium || '',
