@@ -41,6 +41,104 @@ const TEAM_OPTIONS = [
   "Tottenham Hotspur Women","Liverpool Women"
 ];
 
+// Shared upload UI CSS (used in both create and edit forms)
+const UPLOAD_CSS = `
+  .upload-box{background:#f6f4fb;border:1px solid #dcd6ef;border-radius:10px;padding:10px;margin-top:4px}
+  .upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+  .upload-row input[type="file"]{border:none;background:none;padding:4px 0;width:auto;flex:1}
+  .btn-upload{background:#332c54;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:13px;white-space:nowrap}
+  .btn-upload:disabled{opacity:.5;cursor:not-allowed}
+  .upload-status{font-size:12px;color:#6b6691;margin-top:2px}
+  .upload-thumb{width:80px;height:54px;object-fit:cover;border-radius:6px;border:2px solid #ece9f5;margin-top:6px;display:none}
+`;
+
+// Shared upload JS (used in both create and edit forms)
+// cardInputId: the input field to populate with card image URL
+// galleryInputId: the textarea to populate with gallery URLs
+const uploadJS = (cardInputId, galleryInputId) => `
+  // ===== CARD IMAGE UPLOAD =====
+  document.getElementById('cardUploadBtn').addEventListener('click', async function() {
+    var file = document.getElementById('cardUploadFile').files[0];
+    var status = document.getElementById('cardUploadStatus');
+    var thumb = document.getElementById('cardUploadThumb');
+    if (!file) { status.textContent = 'Please select an image first.'; return; }
+    this.disabled = true;
+    status.textContent = 'Uploading...';
+    var fd = new FormData();
+    fd.append('image', file);
+    try {
+      var res = await fetch('/admin/upload-image', { method: 'POST', body: fd });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      document.getElementById('${cardInputId}').value = data.url;
+      thumb.src = data.url;
+      thumb.style.display = 'block';
+      // Update the preview card image if it exists
+      var prev = document.getElementById('prevImg');
+      if (prev) { prev.innerHTML = ''; var im = document.createElement('img'); im.src = data.url; prev.appendChild(im); }
+      status.textContent = 'Uploaded!';
+      status.style.color = '#0a7d32';
+    } catch(err) {
+      status.textContent = 'Error: ' + err.message;
+      status.style.color = '#a12727';
+    } finally {
+      this.disabled = false;
+    }
+  });
+
+  // ===== GALLERY IMAGE UPLOAD =====
+  document.getElementById('galleryUploadBtn').addEventListener('click', async function() {
+    var file = document.getElementById('galleryUploadFile').files[0];
+    var status = document.getElementById('galleryUploadStatus');
+    var thumb = document.getElementById('galleryUploadThumb');
+    if (!file) { status.textContent = 'Please select an image first.'; return; }
+    this.disabled = true;
+    status.textContent = 'Uploading...';
+    var fd = new FormData();
+    fd.append('image', file);
+    try {
+      var res = await fetch('/admin/upload-image', { method: 'POST', body: fd });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      var ta = document.getElementById('${galleryInputId}');
+      ta.value = ta.value ? ta.value + '\n' + data.url : data.url;
+      thumb.src = data.url;
+      thumb.style.display = 'block';
+      status.textContent = 'Uploaded and added!';
+      status.style.color = '#0a7d32';
+    } catch(err) {
+      status.textContent = 'Error: ' + err.message;
+      status.style.color = '#a12727';
+    } finally {
+      this.disabled = false;
+    }
+  });
+`;
+
+// Shared upload HTML for card image section
+const cardUploadHTML = `
+  <div class="upload-box">
+    <div class="upload-row">
+      <input type="file" id="cardUploadFile" accept="image/*"/>
+      <button type="button" class="btn-upload" id="cardUploadBtn">Upload Card Image</button>
+    </div>
+    <div class="upload-status" id="cardUploadStatus"></div>
+    <img class="upload-thumb" id="cardUploadThumb" src="" alt="Uploaded card image"/>
+  </div>
+`;
+
+// Shared upload HTML for gallery images section
+const galleryUploadHTML = `
+  <div class="upload-box">
+    <div class="upload-row">
+      <input type="file" id="galleryUploadFile" accept="image/*"/>
+      <button type="button" class="btn-upload" id="galleryUploadBtn">Upload Gallery Image</button>
+    </div>
+    <div class="upload-status" id="galleryUploadStatus"></div>
+    <img class="upload-thumb" id="galleryUploadThumb" src="" alt="Uploaded gallery image"/>
+  </div>
+`;
+
 /* ===========================================================
    ADMIN LIST (HTML)  —  /api/competitions/admin
 =========================================================== */
@@ -134,8 +232,8 @@ router.get('/admin/competitions/new', (_req, res) => {
       .pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#efeaff;color:#4b3c77;font-size:12px;margin-left:8px}
       .grid{display:grid;grid-template-columns:1fr 420px;gap:20px}
       .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
-      .row{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:center;margin:10px 0}
-      label{color:#5b527a;font-weight:700;font-size:13px}
+      .row{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:start;margin:10px 0}
+      label{color:#5b527a;font-weight:700;font-size:13px;padding-top:10px}
       input,select,textarea{padding:10px;border:1px solid #dcd6ef;border-radius:10px;width:100%;background:#fff;color:#2b2740}
       input[type="date"],input[type="time"]{padding:8px 10px}
       textarea{min-height:80px;resize:vertical}
@@ -162,6 +260,7 @@ router.get('/admin/competitions/new', (_req, res) => {
       .thumb img{width:100%;height:100%;object-fit:cover;display:block}
       .thumb.sel{outline:3px solid rgba(255,87,87,.35);border-color:#ff5757}
       .empty{padding:8px;border:1px dashed #dcd6ef;border-radius:10px;color:#6b6691;font-size:12px}
+      ${UPLOAD_CSS}
     </style>
   </head>
   <body>
@@ -203,19 +302,23 @@ router.get('/admin/competitions/new', (_req, res) => {
           <div class="row"><label>Stadium</label><input id="stadium" name="stadium" placeholder="Stadium name"/></div>
           <div class="row"><label>Prize blurb</label><input id="prizeBlurb" name="prizeBlurb" placeholder="Win VIP hospitality tickets..."/></div>
 
-          <div class="row"><label>Card image</label><input id="cardImage" name="cardImage" placeholder="(optional) one URL"/></div>
-          <div class="row"><label></label>
-            <div style="width:100%">
-              <div class="group-title">Pick ONE for the card (from backend assets)</div>
+          <div class="row">
+            <label>Card image</label>
+            <div>
+              <input id="cardImage" name="cardImage" placeholder="(optional) one URL"/>
+              ${cardUploadHTML}
+              <div class="group-title" style="margin-top:10px">Or pick from backend assets:</div>
               <div id="cardThumbs" class="thumbs"></div>
               <div id="cardEmpty" class="empty" style="display:none">No images found in fansi-backend/public/assets.</div>
             </div>
           </div>
 
-          <div class="row"><label>Gallery images</label><textarea id="images" name="images" placeholder="(optional) one URL per line"></textarea></div>
-          <div class="row"><label></label>
-            <div style="width:100%">
-              <div class="group-title">Pick MULTIPLE for the detail page</div>
+          <div class="row">
+            <label>Gallery images</label>
+            <div>
+              <textarea id="images" name="images" placeholder="(optional) one URL per line"></textarea>
+              ${galleryUploadHTML}
+              <div class="group-title" style="margin-top:10px">Or pick from backend assets:</div>
               <div id="galleryThumbs" class="thumbs"></div>
               <div id="galleryEmpty" class="empty" style="display:none">No images found in fansi-backend/public/assets.</div>
             </div>
@@ -236,7 +339,7 @@ Half time refreshments</textarea>
             <a class="btn" href="/api/competitions/admin">Back to Admin List</a>
           </div>
 
-          <p class="hint">Pick one image for the card. Click to select multiple gallery images. These are served from fansi-backend/public/assets.</p>
+          <p class="hint">You can upload images directly or pick from backend assets below.</p>
         </form>
 
         <aside class="card prev">
@@ -340,6 +443,8 @@ Half time refreshments</textarea>
       document.getElementById("compForm").addEventListener("submit", function(){
         document.getElementById("drawDateHidden").value = buildISO();
       });
+
+      ${uploadJS('cardImage', 'images')}
     </script>
   </body>
 </html>`);
@@ -356,7 +461,7 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
     const teamOptions = TEAM_OPTIONS.map(t => `<option value="${t}"></option>`).join('');
     const assets = listAssetImages();
     const assetsJson = JSON.stringify(assets);
-    const imagesText = (Array.isArray(c.images) ? c.images : []).join('\\n');
+    const imagesText = (Array.isArray(c.images) ? c.images : []).join('\n');
     const d = c.drawDate ? new Date(c.drawDate) : null;
     const dateVal = d ? String(d.toISOString()).slice(0,10) : '';
     const timeVal = d ? String(d.toISOString()).slice(11,16) : '19:30';
@@ -374,8 +479,8 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
       h1{margin:0 0 16px;font-size:28px}
       .grid{display:grid;grid-template-columns:1fr 420px;gap:20px}
       .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
-      .row{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:center;margin:10px 0}
-      label{color:#5b527a;font-weight:700;font-size:13px}
+      .row{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:start;margin:10px 0}
+      label{color:#5b527a;font-weight:700;font-size:13px;padding-top:10px}
       input,select,textarea{padding:10px;border:1px solid #dcd6ef;border-radius:10px;width:100%;background:#fff;color:#2b2740}
       textarea{min-height:80px;resize:vertical}
       .actions{margin-top:14px;display:flex;gap:10px}
@@ -393,6 +498,7 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
       .thumb{position:relative;height:64px;border:1px solid #e6e3ee;border-radius:10px;overflow:hidden;background:#fff;cursor:pointer}
       .thumb img{width:100%;height:100%;object-fit:cover;display:block}
       .thumb.sel{outline:3px solid rgba(255,87,87,.35);border-color:#ff5757}
+      ${UPLOAD_CSS}
     </style>
   </head>
   <body>
@@ -434,24 +540,28 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
           <div class="row"><label>Stadium</label><input id="stadium" name="stadium" value="${(c.stadium||'').replace(/"/g,'&quot;')}" placeholder="Stadium name"/></div>
           <div class="row"><label>Prize blurb</label><input id="prizeBlurb" name="prizeBlurb" value="${(c.prizeBlurb||'').replace(/"/g,'&quot;')}" placeholder="Win VIP hospitality tickets..."/></div>
 
-          <div class="row"><label>Card image</label><input id="cardImage" name="cardImage" value="${(c.prizeImage||'').replace(/"/g,'&quot;')}" placeholder="(optional) one URL"/></div>
-          <div class="row"><label></label>
-            <div style="width:100%">
-              <div class="group-title">Pick ONE for the card (from backend assets)</div>
+          <div class="row">
+            <label>Card image</label>
+            <div>
+              <input id="cardImage" name="cardImage" value="${(c.prizeImage||'').replace(/"/g,'&quot;')}" placeholder="(optional) one URL"/>
+              ${cardUploadHTML}
+              <div class="group-title" style="margin-top:10px">Or pick from backend assets:</div>
               <div id="cardThumbs" class="thumbs"></div>
             </div>
           </div>
 
-          <div class="row"><label>Gallery images</label><textarea id="images" name="images" placeholder="(optional) one URL per line">${imagesText}</textarea></div>
-          <div class="row"><label></label>
-            <div style="width:100%">
-              <div class="group-title">Pick MULTIPLE for the detail page</div>
+          <div class="row">
+            <label>Gallery images</label>
+            <div>
+              <textarea id="images" name="images" placeholder="(optional) one URL per line">${imagesText}</textarea>
+              ${galleryUploadHTML}
+              <div class="group-title" style="margin-top:10px">Or pick from backend assets:</div>
               <div id="galleryThumbs" class="thumbs"></div>
             </div>
           </div>
 
           <div class="row"><label>Details list (one per line)</label>
-            <textarea name="detailsItems">${Array.isArray(c.detailsItems)?c.detailsItems.join('\\n'):""}</textarea>
+            <textarea name="detailsItems">${Array.isArray(c.detailsItems)?c.detailsItems.join('\n'):""}</textarea>
           </div>
 
           <div class="row"><label>Status</label>
@@ -556,6 +666,8 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
       document.getElementById("editForm").addEventListener("submit", function(){
         document.getElementById("drawDateHidden").value = buildISO();
       });
+
+      ${uploadJS('cardImage', 'images')}
     </script>
   </body>
 </html>`);
