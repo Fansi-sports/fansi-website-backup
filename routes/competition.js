@@ -20,6 +20,9 @@ try {
 const ASSETS_DIR = path.join(__dirname, '..', 'public', 'assets');
 router.use('/assets', express.static(ASSETS_DIR, { maxAge: '1h', fallthrough: false }));
 
+// Serve admin static files (e.g. admin-upload.js)
+router.use('/admin-static', express.static(path.join(__dirname, '..', 'public')));
+
 function listAssetImages() {
   try {
     const files = fs.readdirSync(ASSETS_DIR);
@@ -41,7 +44,6 @@ const TEAM_OPTIONS = [
   "Tottenham Hotspur Women","Liverpool Women"
 ];
 
-// Shared upload UI CSS (used in both create and edit forms)
 const UPLOAD_CSS = `
   .upload-box{background:#f6f4fb;border:1px solid #dcd6ef;border-radius:10px;padding:10px;margin-top:4px}
   .upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
@@ -52,70 +54,6 @@ const UPLOAD_CSS = `
   .upload-thumb{width:80px;height:54px;object-fit:cover;border-radius:6px;border:2px solid #ece9f5;margin-top:6px;display:none}
 `;
 
-// Shared upload JS (used in both create and edit forms)
-// cardInputId: the input field to populate with card image URL
-// galleryInputId: the textarea to populate with gallery URLs
-const uploadJS = (cardInputId, galleryInputId) => `
-  // ===== CARD IMAGE UPLOAD =====
-  document.getElementById('cardUploadBtn').addEventListener('click', async function() {
-    var file = document.getElementById('cardUploadFile').files[0];
-    var status = document.getElementById('cardUploadStatus');
-    var thumb = document.getElementById('cardUploadThumb');
-    if (!file) { status.textContent = 'Please select an image first.'; return; }
-    this.disabled = true;
-    status.textContent = 'Uploading...';
-    var fd = new FormData();
-    fd.append('image', file);
-    try {
-      var res = await fetch('/admin/upload-image', { method: 'POST', body: fd });
-      var data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      document.getElementById('${cardInputId}').value = data.url;
-      thumb.src = data.url;
-      thumb.style.display = 'block';
-      // Update the preview card image if it exists
-      var prev = document.getElementById('prevImg');
-      if (prev) { prev.innerHTML = ''; var im = document.createElement('img'); im.src = data.url; prev.appendChild(im); }
-      status.textContent = 'Uploaded!';
-      status.style.color = '#0a7d32';
-    } catch(err) {
-      status.textContent = 'Error: ' + err.message;
-      status.style.color = '#a12727';
-    } finally {
-      this.disabled = false;
-    }
-  });
-
-  // ===== GALLERY IMAGE UPLOAD =====
-  document.getElementById('galleryUploadBtn').addEventListener('click', async function() {
-    var file = document.getElementById('galleryUploadFile').files[0];
-    var status = document.getElementById('galleryUploadStatus');
-    var thumb = document.getElementById('galleryUploadThumb');
-    if (!file) { status.textContent = 'Please select an image first.'; return; }
-    this.disabled = true;
-    status.textContent = 'Uploading...';
-    var fd = new FormData();
-    fd.append('image', file);
-    try {
-      var res = await fetch('/admin/upload-image', { method: 'POST', body: fd });
-      var data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      var ta = document.getElementById('${galleryInputId}');
-      ta.value = ta.value ? ta.value + '\n' + data.url : data.url;
-      thumb.src = data.url;
-      thumb.style.display = 'block';
-      status.textContent = 'Uploaded and added!';
-      status.style.color = '#0a7d32';
-    } catch(err) {
-      status.textContent = 'Error: ' + err.message;
-      status.style.color = '#a12727';
-    } finally {
-      this.disabled = false;
-    }
-  });
-`;
-
-// Shared upload HTML for card image section
 const cardUploadHTML = `
   <div class="upload-box">
     <div class="upload-row">
@@ -127,12 +65,11 @@ const cardUploadHTML = `
   </div>
 `;
 
-// Shared upload HTML for gallery images section
 const galleryUploadHTML = `
   <div class="upload-box">
     <div class="upload-row">
-      <input type="file" id="galleryUploadFile" accept="image/*"/>
-      <button type="button" class="btn-upload" id="galleryUploadBtn">Upload Gallery Image</button>
+      <input type="file" id="galleryUploadFile" accept="image/*" multiple/>
+      <button type="button" class="btn-upload" id="galleryUploadBtn">Upload Gallery Image(s)</button>
     </div>
     <div class="upload-status" id="galleryUploadStatus"></div>
     <img class="upload-thumb" id="galleryUploadThumb" src="" alt="Uploaded gallery image"/>
@@ -443,9 +380,8 @@ Half time refreshments</textarea>
       document.getElementById("compForm").addEventListener("submit", function(){
         document.getElementById("drawDateHidden").value = buildISO();
       });
-
-      ${uploadJS('cardImage', 'images')}
     </script>
+    <script src="/api/competitions/admin-static/admin-upload.js"></script>
   </body>
 </html>`);
 });
@@ -666,9 +602,8 @@ router.get('/admin/competitions/:id/edit', async (req, res) => {
       document.getElementById("editForm").addEventListener("submit", function(){
         document.getElementById("drawDateHidden").value = buildISO();
       });
-
-      ${uploadJS('cardImage', 'images')}
     </script>
+    <script src="/api/competitions/admin-static/admin-upload.js"></script>
   </body>
 </html>`);
   } catch (err) {
