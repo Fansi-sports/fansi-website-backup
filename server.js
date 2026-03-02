@@ -95,22 +95,67 @@ async function allocateUniqueTickets(competitionId, qty, email) {
 function normalizeAnswer(s = "") {
   return (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
 }
-function normalizeQuestion(s = "") {
-  return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
-}
 
-const SKILL_ANSWER_MAP = {
-  "how many players are there in a rugby union team?": "15",
-  "how many players are in a rugby union team?": "15",
-  "how many players are there on a rugby union team?": "15",
-  "which brand makes the famous predator football boots?": "adidas",
+// ✅ Full skill question bank matching src/data/skillQuestions.js
+// Each question maps to an array of accepted normalized answers
+const SKILL_QUESTIONS_MAP = {
+  // Football
+  "how many players are on the pitch for one team in football": ["11", "eleven"],
+  "what colour card means a player is sent off": ["red", "redcard"],
+  "what do you call it when a player scores three goals in one match": ["hattrick", "hatrick"],
+  "how long is a standard football match excluding added time": ["90", "ninety", "90minutes"],
+  "how many points does a team get for a win in most league formats": ["3", "three"],
+
+  // Rugby
+  "how many players are on the field for one team in rugby union": ["15", "fifteen"],
+  "how many points is a try worth in rugby union": ["5", "five"],
+  "what is the name of the set play after the ball goes into touch": ["lineout", "lineup"],
+  "what do you call the set piece used to restart play after a minor infringement": ["scrum"],
+  "how many points is a penalty kick worth in rugby union": ["3", "three"],
+
+  // Tennis
+  "what score comes after 30 in tennis": ["40", "forty"],
+  "what is it called when the score is 4040": ["deuce"],
+  "what piece of equipment do players hit the ball with in tennis": ["racket", "racquet"],
+  "what do you call a serve that the opponent doesnt touch": ["ace"],
+  "what is the score called when a player has 0 points": ["love"],
+
+  // Golf
+  "how many holes are in a full round of golf": ["18", "eighteen"],
+  "what is a score of one under par called": ["birdie"],
+  "what club is usually used on the green": ["putter"],
+  "what do you call getting the ball in the hole in one shot": ["holeinone", "ace"],
+  "what is a score of two under par called": ["eagle"],
+
+  // F1
+  "what does f1 stand for": ["formula1", "formulaone"],
+  "how many points does the race winner score in formula 1": ["25", "twentyfive"],
+  "what do we call the driver stop to change tyres": ["pitstop"],
+  "what session decides the starting grid order for the race": ["qualifying", "quali"],
+  "what is the car called that controls the pace when theres a major incident": ["safetycar"],
 };
 
 function isSkillAnswerCorrect(skillQuestion, selectedAnswer) {
-  const q = normalizeQuestion(skillQuestion || "");
-  const expected = SKILL_ANSWER_MAP[q];
-  if (!expected) return false;
-  return normalizeAnswer(selectedAnswer || "") === normalizeAnswer(expected);
+  // Normalize the question — strip punctuation and extra spaces
+  const q = (skillQuestion || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const accepted = SKILL_QUESTIONS_MAP[q];
+
+  if (!accepted) {
+    console.warn(`⚠️ Skill question not found in map: "${q}"`);
+    return false;
+  }
+
+  const given = normalizeAnswer(selectedAnswer);
+  const match = accepted.includes(given);
+
+  console.log(`🔍 Skill check: q="${q}" given="${given}" accepted=${JSON.stringify(accepted)} match=${match}`);
+
+  return match;
 }
 
 app.use(cors());
@@ -209,6 +254,7 @@ app.post(
             updatedItems.push({
               ...it.toObject(),
               tickets,
+              answeredCorrectly: isCorrect,
             });
           }
 
